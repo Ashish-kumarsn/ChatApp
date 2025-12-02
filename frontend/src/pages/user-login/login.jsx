@@ -126,34 +126,41 @@ const Login = () => {
       country.dialCode.includes(searchTerm)
   );
 
-  const onLoginSubmit = async () => {
-    try {
-      setLoading(true);
-      if (email) {
-        const response = await sendOtp(null, null, email);
-        if (response.status === 'success') {
-          toast.info("OTP sent to your email successfully");
-          setUserPhoneData({ email });
-          setStep(2)
-        }
+const onLoginSubmit = async () => {
+  try {
+    setLoading(true);
+    if (email) {
+      const response = await sendOtp(null, null, email);
+      if (response.status === 'success') {
+        toast.success("OTP sent to your email successfully!", {
+          autoClose: 3000
+        });
+        toast.info("📧 Check your inbox or spam folder", {
+          autoClose: 5000,
+          position: "top-center"
+        });
+        setUserPhoneData({ email });
+        setStep(2)
       }
-      else {
-        const response = await sendOtp(phoneNumber, selectedCountry.dialCode);
-        if (response.status === 'success') {
-          toast.info("OTP is send to your phone number");
-          setUserPhoneData({ phoneNumber, phoneSuffix: selectedCountry.dialCode });
-          setStep(2);
-        }
+    }
+    else {
+      const response = await sendOtp(phoneNumber, selectedCountry.dialCode);
+      if (response.status === 'success') {
+        toast.success("OTP sent to your phone successfully!", {
+          autoClose: 3000
+        });
+        setUserPhoneData({ phoneNumber, phoneSuffix: selectedCountry.dialCode });
+        setStep(2);
       }
-    } catch (error) {
-      console.log(error);
-      setError(error.message || "Failed to send otp")
-
     }
-    finally {
-      setLoading(false)
-    }
+  } catch (error) {
+    console.log(error);
+    setError(error.message || "Failed to send otp")
   }
+  finally {
+    setLoading(false)
+  }
+}
 
   const onOtpSubmit = async () => {
     try {

@@ -1,24 +1,16 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const dotenv = require('dotenv');
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-    host: 'smtp.sendgrid.net',
-    port: 587,
-    secure: false,
-    auth: {
-        user: 'apikey', // Exactly "apikey" likhna hai
-        pass: process.env.SENDGRID_API_KEY
-    }
-});
+// Set SendGrid API Key
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-transporter.verify((error, success) => {
-    if (error) {
-        console.error('⚠️ Email service connection failed:', error.message);
-    } else {
-        console.log('✅ SendGrid ready to send emails');
-    }
-});
+// Startup verification
+if (process.env.SENDGRID_API_KEY) {
+    console.log('✅ SendGrid API Key configured');
+} else {
+    console.error('⚠️ SENDGRID_API_KEY not found in environment variables');
+}
 
 const sendOtpToEmail = async (email, otp) => {
     try {
@@ -46,19 +38,31 @@ const sendOtpToEmail = async (email, otp) => {
         </div>
         `;
 
-        const mailOptions = {
-            from: `Ashish Kumar <kaumatchobey@gmail.com>`, // Verified sender
+        const msg = {
             to: email,
-            subject: 'Your WhatsApp Verification Code',
-            html,
+            from: {
+                email: 'kaumatchobey@gmail.com', // Your verified SendGrid email
+                name: 'Ashish Kumar'
+            },
+            subject: 'Your chatApp Verification Code',
+            html: html,
         };
 
-        await transporter.sendMail(mailOptions);
+        const response = await sgMail.send(msg);
         console.log('✅ Email sent successfully to:', email);
+        console.log('📧 SendGrid response status:', response[0].statusCode);
         return true;
 
     } catch (error) {
         console.error('❌ Error sending email:', error.message);
+        
+        // Detailed error logging
+        if (error.response) {
+            console.error('SendGrid Error Details:');
+            console.error('Status:', error.response.statusCode);
+            console.error('Body:', error.response.body);
+        }
+        
         throw new Error('Failed to send email');
     }
 };
