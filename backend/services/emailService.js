@@ -3,18 +3,20 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.sendgrid.net',
+    port: 587,
+    secure: false,
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        user: 'apikey', // Exactly "apikey" likhna hai
+        pass: process.env.SENDGRID_API_KEY
     }
 });
 
 transporter.verify((error, success) => {
     if (error) {
-        console.error('Gmail services connection failed:', error);
+        console.error('⚠️ Email service connection failed:', error.message);
     } else {
-        console.log('Gmail configured properly and ready to send emails');
+        console.log('✅ SendGrid ready to send emails');
     }
 });
 
@@ -34,7 +36,7 @@ const sendOtpToEmail = async (email, otp) => {
 
           <p><strong>This OTP is valid for the next 5 minutes.</strong> Please do not share this code with anyone.</p>
 
-          <p>If you didn’t request this OTP, please ignore this email.</p>
+          <p>If you didn't request this OTP, please ignore this email.</p>
 
           <p style="margin-top: 20px;">Thanks & Regards,<br/>WhatsApp Web Security Team</p>
 
@@ -45,17 +47,18 @@ const sendOtpToEmail = async (email, otp) => {
         `;
 
         const mailOptions = {
-            from: `WhatsApp Web <${process.env.EMAIL_USER}>`,
+            from: `Ashish Kumar <kaumatchobey@gmail.com>`, // Verified sender
             to: email,
             subject: 'Your WhatsApp Verification Code',
             html,
         };
 
         await transporter.sendMail(mailOptions);
+        console.log('✅ Email sent successfully to:', email);
         return true;
 
     } catch (error) {
-        console.error('Error sending email OTP:', error);
+        console.error('❌ Error sending email:', error.message);
         throw new Error('Failed to send email');
     }
 };
