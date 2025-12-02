@@ -44,19 +44,17 @@ export const initializeSocket = () => {
   console.log(`[Socket] Initializing new connection for user: ${user._id}`);
 
   const socket = io(BACKEND_URL, {
-    auth:{token},
-    // withCredentials: true,
-    transports: ["websocket", "polling"],
+    auth: { token: token() }, // FIXED!!!
+    transports: ["websocket"],
     reconnectionAttempts: SOCKET_CONFIG.RECONNECTION_ATTEMPTS,
     reconnectionDelay: SOCKET_CONFIG.RECONNECTION_DELAY,
     timeout: SOCKET_CONFIG.PING_TIMEOUT,
     pingTimeout: SOCKET_CONFIG.PING_TIMEOUT,
     pingInterval: SOCKET_CONFIG.PING_INTERVAL,
-    query: {
-      userId: user._id
-    },
+    query: { userId: user._id },
     autoConnect: true,
   });
+
 
   // Connection successful
   socket.on("connect", () => {
@@ -81,7 +79,7 @@ export const initializeSocket = () => {
   // Reconnection successful
   socket.io.on("reconnect", (attemptNumber) => {
     console.log(`[Socket] Reconnected after ${attemptNumber} attempts - User: ${user._id}`);
-  
+
     socket.emit("user_connected", user._id);
   });
 
