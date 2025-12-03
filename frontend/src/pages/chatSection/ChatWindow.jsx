@@ -49,12 +49,22 @@ const ChatWindow = ({ selectedContact, setSelectedContact }) => {
     addReaction,
     deleteMessage,
     cleanup,
+    setCurrentUser,
   } = useChatStore();
 
   // get online status and last seen
   const online = isUserOnline(selectedContact?._id);
   const lastSeen = getUserLastSeen(selectedContact?._id);
   const isTyping = isUserTyping(selectedContact?._id);
+
+    // ✅ Chat store ko hamesha auth user se sync rakho
+  useEffect(() => {
+    if (user?._id) {
+      setCurrentUser(user);
+      console.log('[ChatWindow] currentUser set in chatStore:', user._id);
+    }
+  }, [user?._id, user, setCurrentUser]);
+
 
   useEffect(() => {
     if (selectedContact?._id && conversations?.data?.length > 0) {
@@ -203,23 +213,32 @@ const ChatWindow = ({ selectedContact, setSelectedContact }) => {
 
 
 const handleVideoCall = () => {
-    if(selectedContact && online){
+    if (!selectedContact) {
+      console.error('[ChatWindow] No contact selected');
+      return;
+    }
+
+    console.log('[ChatWindow] Video call button clicked');
+    console.log('[ChatWindow] Selected contact online status:', online);
+    console.log('[ChatWindow] Selected contact ID:', selectedContact._id);
+    
+    if (online) {
       const {initiateCall} = useVideoCallStore.getState();
 
-      // ✅ Create proper receiverInfo object
       const receiverInfo = {
         username: selectedContact.username,
         profilePicture: selectedContact.profilePicture,
       };
 
-      // ✅ Call with correct parameters: (receiverId, receiverInfo, callType)
+      console.log('[ChatWindow] Initiating call with receiver info:', receiverInfo);
+
       initiateCall(
-        selectedContact._id,    // receiverId
-        receiverInfo,           // receiverInfo object
-        "video"                 // callType
+        selectedContact._id,
+        receiverInfo,
+        "video"
       );
-    }
-    else{
+    } else {
+      console.warn('[ChatWindow] Cannot call - user is offline');
       alert("User is offline, can't connect");
     }
   }

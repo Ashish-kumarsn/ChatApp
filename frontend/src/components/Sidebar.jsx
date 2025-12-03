@@ -4,7 +4,7 @@ import useThemeStore from '../store/themeStore';
 import useUserStore from '../store/useUserStore'
 import useLayoutStore from '../store/layoutStore';
 import { motion } from "framer-motion"
-import { FaWhatsapp, FaUserCircle, FaCog } from "react-icons/fa";
+import {  FaUserCircle, FaCog, FaComments } from "react-icons/fa";
 import { MdRadioButtonChecked } from "react-icons/md";
 
 
@@ -49,7 +49,7 @@ const Sidebar = () => {
         to='/'
         className={`${isMobile ? " " : "mb-8"} ${activeTab === "chats" && "bg-gray-300 shadow-sm- p-2 rounded-full"} focus:outline-none`}
       >
-        <FaWhatsapp className={`h-6 w-6 ${activeTab === "chats" ? theme === "dark" ? "text-gray-800" : "" : theme === "dark" ? "text-gray-300" : "text-gray-800"}`} />
+        <FaComments className={`h-6 w-6 ${activeTab === "chats" ? theme === "dark" ? "text-gray-800" : "" : theme === "dark" ? "text-gray-300" : "text-gray-800"}`} />
 
       </Link>
 

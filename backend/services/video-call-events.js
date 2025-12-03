@@ -61,122 +61,135 @@ const isCallActive = (callId) => {
 const handleVideoCallEvent = (socket, io, onlineUsers) => {
     
     
-    socket.on('initiate_call', ({ callerId, receiverId, callType, callerInfo }) => {
-        try {
-            // Validation
-            if (!callerId || !receiverId) {
-                console.error('[VideoCall] initiate_call: Missing caller or receiver ID');
-                socket.emit('call_failed', { 
-                    reason: 'Invalid call parameters',
-                    error: 'Missing caller or receiver ID'
-                });
-                return;
-            }
-
-            if (!validateUserInfo(callerInfo)) {
-                console.error('[VideoCall] initiate_call: Invalid caller info');
-                socket.emit('call_failed', { 
-                    reason: 'Invalid caller information' 
-                });
-                return;
-            }
-
-            if (!['audio', 'video'].includes(callType)) {
-                console.error('[VideoCall] initiate_call: Invalid call type');
-                socket.emit('call_failed', { 
-                    reason: 'Invalid call type. Must be "audio" or "video"' 
-                });
-                return;
-            }
-
-            // Prevent calling yourself
-            if (callerId.toString() === receiverId.toString()) {
-                socket.emit('call_failed', { 
-                    reason: 'Cannot call yourself' 
-                });
-                return;
-            }
-
-            // Check if receiver is online
-            const receiverSockets = getSocketIds(onlineUsers, receiverId);
-            if (!receiverSockets) {
-                console.log(`[VideoCall] Receiver ${receiverId} is offline`);
-                socket.emit('call_failed', { 
-                    reason: 'User is offline',
-                    receiverId 
-                });
-                return;
-            }
-
-            // Generate unique call ID
-            const callId = generateCallId(callerId, receiverId);
-
-            // Store call in active calls
-            const callData = {
-                callId,
-                callerId: callerId.toString(),
-                receiverId: receiverId.toString(),
-                callType,
-                status: 'ringing',
-                initiatedAt: new Date(),
-                timeout: null,
-            };
-
-            // Set call timeout (auto-reject after 60 seconds if not answered)
-            callData.timeout = setTimeout(() => {
-                if (activeCalls.has(callId)) {
-                    const call = activeCalls.get(callId);
-                    if (call.status === 'ringing') {
-                        console.log(`[VideoCall] Call ${callId} timed out`);
-                        
-                        // Notify caller
-                        emitToUser(io, onlineUsers, callerId, 'call_timeout', { 
-                            callId,
-                            reason: 'No answer'
-                        });
-                        
-                        // Notify receiver
-                        emitToUser(io, onlineUsers, receiverId, 'call_cancelled', { 
-                            callId 
-                        });
-                        
-                        cleanupCall(callId);
-                    }
-                }
-            }, CALL_TIMEOUT);
-
-            activeCalls.set(callId, callData);
-
-            // Send incoming call to all receiver's devices
-            const incomingCallData = {
-                callId,
-                callerId: callerId.toString(),
-                receiverId: receiverId.toString(),
-                callerName: callerInfo.username,
-                callerAvatar: callerInfo.profilePicture || null,
-                callType,
-                timestamp: new Date(),
-            };
-
-            emitToUser(io, onlineUsers, receiverId, 'incoming_call', incomingCallData);
-
-            // Send confirmation to caller
-            socket.emit('call_initiated', {
-                callId,
-                status: 'ringing',
-                receiverId,
-            });
-
-            console.log(`[VideoCall] Call initiated: ${callId} (${callType})`);
-
-        } catch (error) {
-            console.error('[VideoCall] Error in initiate_call:', error);
+socket.on('initiate_call', ({ callerId, receiverId, callType, callerInfo }) => {
+    try {
+        // Validation
+        if (!callerId || !receiverId) {
+            console.error('[VideoCall] initiate_call: Missing caller or receiver ID');
             socket.emit('call_failed', { 
-                reason: 'Failed to initiate call',
-                error: error.message 
+                reason: 'Invalid call parameters',
+                error: 'Missing caller or receiver ID'
             });
+            return;
         }
-    });
+
+        if (!validateUserInfo(callerInfo)) {
+            console.error('[VideoCall] initiate_call: Invalid caller info');
+            socket.emit('call_failed', { 
+                reason: 'Invalid caller information' 
+            });
+            return;
+        }
+
+        if (!['audio', 'video'].includes(callType)) {
+            console.error('[VideoCall] initiate_call: Invalid call type');
+            socket.emit('call_failed', { 
+                reason: 'Invalid call type. Must be "audio" or "video"' 
+            });
+            return;
+        }
+
+        // Prevent calling yourself
+        if (callerId.toString() === receiverId.toString()) {
+            socket.emit('call_failed', { 
+                reason: 'Cannot call yourself' 
+            });
+            return;
+        }
+
+        // ✅ Check if receiver is online with detailed logging
+        console.log(`[VideoCall] Checking online status for receiver: ${receiverId}`);
+        console.log(`[VideoCall] Online users map:`, Array.from(onlineUsers.keys()));
+        
+        const receiverSockets = getSocketIds(onlineUsers, receiverId);
+        
+        if (!receiverSockets) {
+            console.log(`[VideoCall] Receiver ${receiverId} is offline - no sockets found`);
+            socket.emit('call_failed', { 
+                reason: 'User is offline',
+                receiverId 
+            });
+            return;
+        }
+
+        console.log(`[VideoCall] Receiver ${receiverId} is online with ${receiverSockets.length} socket(s)`);
+
+        // Generate unique call ID
+        const callId = generateCallId(callerId, receiverId);
+
+        // Store call in active calls
+        const callData = {
+            callId,
+            callerId: callerId.toString(),
+            receiverId: receiverId.toString(),
+            callType,
+            status: 'ringing',
+            initiatedAt: new Date(),
+            timeout: null,
+        };
+
+        // Set call timeout (auto-reject after 60 seconds if not answered)
+        callData.timeout = setTimeout(() => {
+            if (activeCalls.has(callId)) {
+                const call = activeCalls.get(callId);
+                if (call.status === 'ringing') {
+                    console.log(`[VideoCall] Call ${callId} timed out`);
+                    
+                    // Notify caller
+                    emitToUser(io, onlineUsers, callerId, 'call_timeout', { 
+                        callId,
+                        reason: 'No answer'
+                    });
+                    
+                    // Notify receiver
+                    emitToUser(io, onlineUsers, receiverId, 'call_cancelled', { 
+                        callId 
+                    });
+                    
+                    cleanupCall(callId);
+                }
+            }
+        }, CALL_TIMEOUT);
+
+        activeCalls.set(callId, callData);
+
+        // Send incoming call to all receiver's devices
+        const incomingCallData = {
+            callId,
+            callerId: callerId.toString(),
+            receiverId: receiverId.toString(),
+            callerName: callerInfo.username,
+            callerAvatar: callerInfo.profilePicture || null,
+            callType,
+            timestamp: new Date(),
+        };
+
+        console.log(`[VideoCall] Emitting incoming_call to receiver ${receiverId}:`, incomingCallData);
+        const emitSuccess = emitToUser(io, onlineUsers, receiverId, 'incoming_call', incomingCallData);
+        
+        if (!emitSuccess) {
+            console.error(`[VideoCall] Failed to emit incoming_call to receiver ${receiverId}`);
+        } else {
+            console.log(`[VideoCall] Successfully emitted incoming_call to receiver ${receiverId}`);
+        }
+
+        // Send confirmation to caller
+        socket.emit('call_initiated', {
+            callId,
+            status: 'ringing',
+            receiverId,
+        });
+
+        console.log(`[VideoCall] Call initiated: ${callId} (${callType})`);
+
+    } catch (error) {
+        console.error('[VideoCall] Error in initiate_call:', error);
+        socket.emit('call_failed', { 
+            reason: 'Failed to initiate call',
+            error: error.message 
+        });
+    }
+});
 
     // ACCEPT CALL
     

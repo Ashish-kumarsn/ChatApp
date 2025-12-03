@@ -57,11 +57,45 @@ export const initializeSocket = () => {
 
 
   // Connection successful
-  socket.on("connect", () => {
-    console.log(`[Socket] Connected - User: ${user._id} | Socket ID: ${socket.id}`);
+socket.on("connect", async () => {
+    console.log(
+      `[Socket] Connected - User: ${user._id} | Socket ID: ${socket.id}`
+    );
 
     // Emit user_connected event to backend
     socket.emit("user_connected", user._id);
+
+    // 🔥 Initialize chat store listeners
+    try {
+      const { useChatStore } = await import("../store/chatStore");
+
+      const { initsocketListners, setCurrentUser } =
+        useChatStore.getState();
+
+      // ensure chat store ke paas current user ho
+      setCurrentUser(user);
+
+      // socket listeners attach + online status sync
+      initsocketListners();
+      
+      console.log('[Socket] Chat listeners initialized on connect');
+    } catch (err) {
+      console.error(
+        "[Socket] Failed to init chat listeners from connect:",
+        err
+      );
+    }
+
+    // ✅ Re-initialize video call listeners on reconnect
+    try {
+      const { default: useVideoCallStore } = await import("../store/videoCallStore");
+      const { initializeSocket: initVideoCallSocket } = useVideoCallStore.getState();
+      
+      console.log('[Socket] Triggering video call listeners re-initialization');
+      initVideoCallSocket();
+    } catch (err) {
+      console.error("[Socket] Failed to init video call listeners:", err);
+    }
   });
 
   // Connection acknowledgment from server

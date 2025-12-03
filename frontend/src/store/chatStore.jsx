@@ -20,6 +20,7 @@ export const useChatStore = create((set, get) => ({
     },
 
     // SOCKET LISTENERS SETUP
+    // SOCKET LISTENERS SETUP
     initsocketListners: () => {
         const socket = getSocket();
         if (!socket) {
@@ -28,224 +29,248 @@ export const useChatStore = create((set, get) => ({
         }
 
         const { socketInitialized } = get();
-        if (socketInitialized) {
-            console.log('[Chat] Socket already initialized');
-            return;
+
+        // 🔁 Listeners sirf pehli baar attach karne hain
+        if (!socketInitialized) {
+            // Purane listeners hata do (safety)
+            socket.off("connection_ack");
+            socket.off("receive_message");
+            socket.off("message_sent");
+            socket.off("message_read");
+            socket.off("reaction_update");
+            socket.off("message_deleted");
+            socket.off("message_error");
+            socket.off("user_typing");
+            socket.off("user_status");
+
+            console.log('[Chat] Attaching socket listeners...');
+
+            // CONNECTION ACKNOWLEDGMENT
+            socket.on("connection_ack", ({ success, userId, socketId }) => {
+                try {
+                    if (success) {
+                        console.log('[Chat] Connection acknowledged:', socketId);
+                        set({ isConnected: true });
+                    }
+                } catch (error) {
+                    console.error('[Chat] Error handling connection_ack:', error);
+                }
+            });
+
+            // RECEIVE MESSAGE
+            socket.on("receive_message", (message) => {
+                try {
+                    if (!message || !message._id) {
+                        console.error('[Chat] Invalid receive_message data:', message);
+                        return;
+                    }
+
+                    console.log('[Chat] Message received:', message._id);
+                    const { receiveMessage } = get();
+                    receiveMessage(message);
+                } catch (error) {
+                    console.error('[Chat] Error handling receive_message:', error);
+                }
+            });
+
+            // MESSAGE SENT CONFIRMATION
+            socket.on("message_sent", (data = {}) => {
+                try {
+                    const { messageId, status, timestamp } = data;
+
+                    if (!messageId) {
+                        console.error('[Chat] Invalid message_sent data:', data);
+                        return;
+                    }
+
+                    console.log('[Chat] Message sent confirmed:', messageId);
+
+                    set((state) => ({
+                        messages: state.messages.map((msg) =>
+                            msg._id === messageId
+                                ? {
+                                    ...msg,
+                                    messageStatus: status || "delivered",
+                                    sentAt: timestamp || msg.sentAt,
+                                }
+                                : msg
+                        ),
+                    }));
+                } catch (error) {
+                    console.error('[Chat] Error handling message_sent:', error);
+                }
+            });
+
+            // MESSAGE STATUS UPDATE (READ)
+            socket.on("message_read", (data = {}) => {
+                try {
+                    const { messageId, messageStatus, readAt } = data;
+
+                    if (!messageId) {
+                        console.error('[Chat] Invalid message_read data:', data);
+                        return;
+                    }
+
+                    console.log('[Chat] Message read update:', messageId, messageStatus);
+
+                    set((state) => ({
+                        messages: state.messages.map((msg) =>
+                            msg._id === messageId
+                                ? {
+                                    ...msg,
+                                    messageStatus:
+                                        messageStatus || msg.messageStatus || "read",
+                                    readAt:
+                                        readAt ||
+                                        msg.readAt ||
+                                        new Date().toISOString(),
+                                }
+                                : msg
+                        ),
+                    }));
+                } catch (error) {
+                    console.error('[Chat] Error handling message_read:', error);
+                }
+            });
+
+            // REACTION UPDATE
+            socket.on(
+                "reaction_update",
+                ({ messageId, reactions, updatedAt } = {}) => {
+                    try {
+                        if (!messageId) {
+                            console.error('[Chat] Invalid reaction_update data');
+                            return;
+                        }
+
+                        console.log(
+                            "[Chat] Reaction update:",
+                            messageId,
+                            reactions?.length
+                        );
+
+                        set((state) => ({
+                            messages: state.messages.map((msg) =>
+                                msg._id === messageId
+                                    ? {
+                                        ...msg,
+                                        reactions: reactions || msg.reactions || [],
+                                        lastReactionAt: updatedAt,
+                                    }
+                                    : msg
+                            ),
+                        }));
+                    } catch (error) {
+                        console.error('[Chat] Error handling reaction_update:', error);
+                    }
+                }
+            );
+
+            // MESSAGE DELETED
+            socket.on("message_deleted", (deletedMessageId) => {
+                try {
+                    if (!deletedMessageId) {
+                        console.error('[Chat] Invalid message_deleted data');
+                        return;
+                    }
+
+                    console.log('[Chat] Message deleted:', deletedMessageId);
+
+                    set((state) => ({
+                        messages: state.messages.filter(
+                            (msg) => msg._id !== deletedMessageId
+                        ),
+                    }));
+                } catch (error) {
+                    console.error('[Chat] Error handling message_deleted:', error);
+                }
+            });
+
+            // MESSAGE ERROR
+            socket.on("message_error", (error) => {
+                console.error('[Chat] Message error:', error);
+
+                const errorMessage =
+                    error?.error || error?.message || "Message operation failed";
+
+                set({ error: errorMessage });
+
+                if (error?.messageId) {
+                    set((state) => ({
+                        messages: state.messages.map((msg) =>
+                            msg._id === error.messageId
+                                ? { ...msg, messageStatus: "failed" }
+                                : msg
+                        ),
+                    }));
+                }
+            });
+
+            // USER TYPING
+            socket.on("user_typing", ({ userId, conversationId, isTyping }) => {
+                try {
+                    if (!userId || !conversationId) {
+                        console.error('[Chat] Invalid user_typing data');
+                        return;
+                    }
+
+                    set((state) => {
+                        const newTypingUsers = new Map(state.typingUsers);
+
+                        if (!newTypingUsers.has(conversationId)) {
+                            newTypingUsers.set(conversationId, new Set());
+                        }
+
+                        const typingSet = newTypingUsers.get(conversationId);
+
+                        if (isTyping) {
+                            typingSet.add(userId);
+                        } else {
+                            typingSet.delete(userId);
+                        }
+
+                        return { typingUsers: newTypingUsers };
+                    });
+                } catch (error) {
+                    console.error('[Chat] Error handling user_typing:', error);
+                }
+            });
+
+            // USER STATUS (ONLINE/OFFLINE)
+            socket.on(
+                "user_status",
+                ({ userId, isOnline, lastSeen, timestamp }) => {
+                    try {
+                        if (!userId) {
+                            console.error('[Chat] Invalid user_status data');
+                            return;
+                        }
+
+                        console.log(
+                            "[Chat] User status update:",
+                            userId,
+                            isOnline ? "online" : "offline"
+                        );
+
+                        set((state) => {
+                            const newOnlineUsers = new Map(state.onlineUsers);
+                            newOnlineUsers.set(userId, {
+                                isOnline,
+                                lastSeen: lastSeen || timestamp,
+                            });
+                            return { onlineUsers: newOnlineUsers };
+                        });
+                    } catch (error) {
+                        console.error('[Chat] Error handling user_status:', error);
+                    }
+                }
+            );
+
+            set({ socketInitialized: true });
+            console.log("[Chat] Socket listeners attached");
         }
 
-        socket.off("connection_ack");
-        socket.off("receive_message");
-        socket.off("message_sent");
-        socket.off("message_read");
-        socket.off("reaction_update");
-        socket.off("message_deleted");
-        socket.off("message_error");
-        socket.off("user_typing");
-        socket.off("user_status");
-
-        console.log('[Chat] Initializing socket listeners...');
-
-        // CONNECTION ACKNOWLEDGMENT
-        socket.on("connection_ack", ({ success, userId, socketId }) => {
-            try {
-                if (success) {
-                    console.log('[Chat] Connection acknowledged:', socketId);
-                    set({ isConnected: true });
-                }
-            } catch (error) {
-                console.error('[Chat] Error handling connection_ack:', error);
-            }
-        });
-
-        // RECEIVE MESSAGE
-        socket.on("receive_message", (message) => {
-            try {
-                if (!message || !message._id) {
-                    console.error('[Chat] Invalid receive_message data:', message);
-                    return;
-                }
-
-                console.log('[Chat] Message received:', message._id);
-                const { receiveMessage } = get();
-                receiveMessage(message);
-            } catch (error) {
-                console.error('[Chat] Error handling receive_message:', error);
-            }
-        });
-
-        // MESSAGE SENT CONFIRMATION
-        socket.on("message_sent", (data) => {
-            try {
-                const { messageId, status, timestamp } = data;
-
-                if (!messageId) {
-                    console.error('[Chat] Invalid message_sent data:', data);
-                    return;
-                }
-
-                console.log('[Chat] Message sent confirmed:', messageId);
-
-                set((state) => ({
-                    messages: state.messages.map((msg) =>
-                        msg._id === messageId
-                            ? {
-                                ...msg,
-                                messageStatus: status || 'delivered',
-                                sentAt: timestamp || msg.sentAt,
-                            }
-                            : msg
-                    ),
-                }));
-            } catch (error) {
-                console.error('[Chat] Error handling message_sent:', error);
-            }
-        });
-
-        // MESSAGE STATUS UPDATE (READ)
-        socket.on("message_read", ({ messageId, messageStatus, readAt }) => {
-            try {
-                if (!messageId) {
-                    console.error('[Chat] Invalid message_read data');
-                    return;
-                }
-
-                console.log('[Chat] Message read update:', messageId, messageStatus);
-
-                set((state) => ({
-                    messages: state.messages.map((msg) =>
-                        msg._id === messageId
-                            ? {
-                                ...msg,
-                                messageStatus: messageStatus || msg.messageStatus,
-                                readAt: readAt || msg.readAt,
-                            }
-                            : msg
-                    ),
-                }));
-            } catch (error) {
-                console.error('[Chat] Error handling message_read:', error);
-            }
-        });
-
-
-        // REACTION UPDATE
-        socket.on("reaction_update", ({ messageId, reactions, updatedAt }) => {
-            try {
-                if (!messageId) {
-                    console.error('[Chat] Invalid reaction_update data');
-                    return;
-                }
-
-                console.log('[Chat] Reaction update:', messageId, reactions?.length);
-
-                set((state) => ({
-                    messages: state.messages.map((msg) =>
-                        msg._id === messageId
-                            ? {
-                                ...msg,
-                                reactions: reactions || msg.reactions || [],
-                                lastReactionAt: updatedAt,
-                            }
-                            : msg
-                    ),
-                }));
-            } catch (error) {
-                console.error('[Chat] Error handling reaction_update:', error);
-            }
-        });
-
-        // MESSAGE DELETED
-        socket.on("message_deleted", (deletedMessageId) => {
-            try {
-                if (!deletedMessageId) {
-                    console.error('[Chat] Invalid message_deleted data');
-                    return;
-                }
-
-                console.log('[Chat] Message deleted:', deletedMessageId);
-
-                set((state) => ({
-                    messages: state.messages.filter((msg) => msg._id !== deletedMessageId),
-                }));
-            } catch (error) {
-                console.error('[Chat] Error handling message_deleted:', error);
-            }
-        });
-
-        // MESSAGE ERROR
-        socket.on("message_error", (error) => {
-            console.error('[Chat] Message error:', error);
-
-            const errorMessage = error?.error || error?.message || 'Message operation failed';
-
-            set({ error: errorMessage });
-
-            // Update message status if messageId is provided
-            if (error?.messageId) {
-                set((state) => ({
-                    messages: state.messages.map((msg) =>
-                        msg._id === error.messageId
-                            ? { ...msg, messageStatus: 'failed' }
-                            : msg
-                    ),
-                }));
-            }
-        });
-
-        // USER TYPING
-        socket.on("user_typing", ({ userId, conversationId, isTyping }) => {
-            try {
-                if (!userId || !conversationId) {
-                    console.error('[Chat] Invalid user_typing data');
-                    return;
-                }
-
-                set((state) => {
-                    const newTypingUsers = new Map(state.typingUsers);
-
-                    if (!newTypingUsers.has(conversationId)) {
-                        newTypingUsers.set(conversationId, new Set());
-                    }
-
-                    const typingSet = newTypingUsers.get(conversationId);
-
-                    if (isTyping) {
-                        typingSet.add(userId);
-                    } else {
-                        typingSet.delete(userId);
-                    }
-
-                    return { typingUsers: newTypingUsers };
-                });
-            } catch (error) {
-                console.error('[Chat] Error handling user_typing:', error);
-            }
-        });
-
-        // USER STATUS (ONLINE/OFFLINE)
-        socket.on("user_status", ({ userId, isOnline, lastSeen, timestamp }) => {
-            try {
-                if (!userId) {
-                    console.error('[Chat] Invalid user_status data');
-                    return;
-                }
-
-                console.log('[Chat] User status update:', userId, isOnline ? 'online' : 'offline');
-
-                set((state) => {
-                    const newOnlineUsers = new Map(state.onlineUsers);
-                    newOnlineUsers.set(userId, {
-                        isOnline,
-                        lastSeen: lastSeen || timestamp,
-                    });
-                    return { onlineUsers: newOnlineUsers };
-                });
-            } catch (error) {
-                console.error('[Chat] Error handling user_status:', error);
-            }
-        });
-
-        // REQUEST STATUS FOR ALL CONVERSATION PARTICIPANTS
+        // 👇 Ye part har call pe chalega (status refresh for all participants)
         const { conversations, currentUser } = get();
 
         if (conversations?.data?.length > 0 && currentUser?._id) {
@@ -270,10 +295,8 @@ export const useChatStore = create((set, get) => ({
                 }
             });
         }
-
-        set({ socketInitialized: true });
-        console.log('[Chat] Socket listeners initialized');
     },
+
 
     // FETCH CONVERSATIONS
     fetchConversations: async () => {

@@ -41,6 +41,7 @@ const VideoCallModal = () => {
     rejectCall,
     endCall,
     clearError,
+    cancelCall
   } = useVideoCallStore();
 
   const { user } = useUserStore();
@@ -185,9 +186,8 @@ const VideoCallModal = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm">
       <div
-        className={`relative w-full h-full max-w-6xl max-h-screen rounded-lg overflow-hidden shadow-2xl ${
-          theme === 'dark' ? 'bg-gray-900' : 'bg-white'
-        }`}
+        className={`relative w-full h-full max-w-6xl max-h-screen rounded-lg overflow-hidden shadow-2xl ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'
+          }`}
       >
         {/* Incoming Call UI */}
         {incomingCall && !isCallActive && (
@@ -270,9 +270,8 @@ const VideoCallModal = () => {
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
-                className={`w-full h-full object-cover ${
-                  remoteStream ? 'block' : 'hidden'
-                }`}
+                className={`w-full h-full object-cover ${remoteStream ? 'block' : 'hidden'
+                  }`}
               />
             )}
 
@@ -327,14 +326,12 @@ const VideoCallModal = () => {
             {/* Status bar */}
             <div className="absolute top-4 left-4 flex items-center gap-3">
               <div
-                className={`px-4 py-2 rounded-full ${
-                  theme === 'dark' ? 'bg-gray-800' : 'bg-white'
-                } bg-opacity-90 backdrop-blur-sm shadow-lg`}
+                className={`px-4 py-2 rounded-full ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+                  } bg-opacity-90 backdrop-blur-sm shadow-lg`}
               >
                 <p
-                  className={`text-sm font-medium ${
-                    theme === 'dark' ? 'text-white' : 'text-gray-900'
-                  }`}
+                  className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                    }`}
                 >
                   {getStatusText()}
                 </p>
@@ -355,12 +352,13 @@ const VideoCallModal = () => {
             {/* Cancel while calling */}
             {callStatus === 'calling' && (
               <button
-                onClick={endCall}
+                onClick={cancelCall}
                 className="absolute top-4 right-4 w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-200 hover:scale-110"
               >
                 <FaTimes className="w-5 h-5" />
               </button>
             )}
+
 
             {/* Bottom controls */}
             <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
@@ -368,11 +366,10 @@ const VideoCallModal = () => {
                 {callType === 'video' && (
                   <button
                     onClick={toggleVideo}
-                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 ${
-                      isVideoEnabled
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 ${isVideoEnabled
                         ? 'bg-gray-700 hover:bg-gray-600 text-white'
                         : 'bg-red-500 hover:bg-red-600 text-white'
-                    }`}
+                      }`}
                     title={
                       isVideoEnabled ? 'Turn off camera' : 'Turn on camera'
                     }
@@ -387,11 +384,10 @@ const VideoCallModal = () => {
 
                 <button
                   onClick={toggleAudio}
-                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 ${
-                    isAudioEnabled
+                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 ${isAudioEnabled
                       ? 'bg-gray-700 hover:bg-gray-600 text-white'
                       : 'bg-red-500 hover:bg-red-600 text-white'
-                  }`}
+                    }`}
                   title={isAudioEnabled ? 'Mute' : 'Unmute'}
                 >
                   {isAudioEnabled ? (

@@ -8,7 +8,7 @@ import useThemeStore from "../../store/themeStore"
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { motion } from 'framer-motion';
-import { FaArrowLeft, FaChevronDown, FaPlus, FaUser, FaWhatsapp } from "react-icons/fa";
+import { FaArrowLeft, FaChevronDown, FaComments, FaPlus, FaUser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import Spinner from "../../utils/spinner";
 import { sendOtp, verifyOtp, updateUserProfile } from "../../services/user.service";
@@ -184,7 +184,7 @@ const onLoginSubmit = async () => {
         const user = response.data?.user;
         if (user?.username && user?.profilePicture) {
           setUser(user);
-          toast.success("Welcome back to Whatsapp");
+          toast.success("Welcome back to Samvaad");
           navigate('/');
           resetLoginState();
 
@@ -223,7 +223,7 @@ const onLoginSubmit = async () => {
         formData.append("profilePicture", selectedAvatar);
       }
       await updateUserProfile(formData);
-      toast.success("Welcome back to whatsapp");
+      toast.success("Welcome back to Samvaad");
       navigate('/')
       resetLoginState();
     } catch (error) {
@@ -280,11 +280,11 @@ const onLoginSubmit = async () => {
           className="w-24 h-24 bg-green-500 rounded-full mx-auto mb-6 flex items-center justify-center"
 
         >
-          <FaWhatsapp className="w-16 h-16 text-white" />
+          <FaComments className="w-16 h-16 text-white" />
 
         </motion.div>
         <h1 className={`text-3xl font-bold text-center mb-6 ${theme === "dark" ? "text-white" : "text-gray-800"}`}>
-          WhatsApp Login
+          Samvaad Login
         </h1>
         <ProgressBar />
         {error && <p className="text-red-500 text-center mb-4">{error}</p>}

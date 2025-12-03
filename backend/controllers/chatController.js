@@ -174,22 +174,24 @@ exports.markAsRead = async (req, res) => {
       msg.messageStatus = 'read';
     });
 
-    // ✅ UPDATED: Handle multiple socket IDs per sender
+    // ✅ Notify senders on all their active sockets with a consistent payload
     if (req.io && req.socketUserMap) {
       for (const message of messages) {
         const senderSocketIds = req.socketUserMap.get(message.sender.toString());
         if (senderSocketIds && senderSocketIds.length > 0) {
-          const updatedMessage = {
-            _id: message._id,
+          const payload = {
+            messageId: message._id.toString(),   // 👈 IMPORTANT: `messageId`, not `_id`
             messageStatus: 'read',
+            readAt: new Date(),
           };
-          // ✅ Send to all sender's active sockets
+
           senderSocketIds.forEach(socketId => {
-            req.io.to(socketId).emit('message_read', updatedMessage);
+            req.io.to(socketId).emit('message_read', payload);
           });
         }
       }
     }
+
 
     return response(res, 200, 'message marked as read', messages);
 
@@ -214,11 +216,11 @@ exports.deleteMessage = async (req, res) => {
     // ✅ NEW: Update conversation's lastMessage if this was the last message
     const conversation = await Conversation.findById(message.conversation);
     if (conversation && conversation.lastMessage?.toString() === messageId) {
-      const newLastMessage = await Message.findOne({ 
+      const newLastMessage = await Message.findOne({
         conversation: message.conversation,
         _id: { $ne: messageId }
       }).sort({ createdAt: -1 });
-      
+
       conversation.lastMessage = newLastMessage?._id || null;
       await conversation.save();
     }

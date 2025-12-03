@@ -59,12 +59,22 @@ const useVideoCallStore = create(
                 return;
             }
 
-            const { socketInitialized } = get();
-            if (socketInitialized) {
-                console.log('[VideoCall] Socket already initialized');
+            // ✅ Check if socket is connected first
+            if (!socket.connected) {
+                console.warn('[VideoCall] Socket not connected yet, waiting...');
+
+                const handleConnect = () => {
+                    console.log('[VideoCall] Socket connected, initializing listeners');
+                    socket.off('connect', handleConnect);
+                    get().initializeSocket();
+                };
+
+                socket.once('connect', handleConnect);
                 return;
             }
 
+            // ✅ ALWAYS remove old listeners (prevent duplicates)
+            console.log('[VideoCall] Removing old listeners and re-attaching...');
             socket.off('incoming_call');
             socket.off('call_initiated');
             socket.off('call_accepted');
@@ -79,7 +89,7 @@ const useVideoCallStore = create(
             socket.off('webrtc_ice_candidate');
             socket.off('webrtc_error');
 
-            console.log('[VideoCall] Initializing socket listeners...');
+            console.log('[VideoCall] Attaching fresh socket listeners...');
 
             // INCOMING CALL
             socket.on('incoming_call', (data) => {
@@ -370,6 +380,7 @@ const useVideoCallStore = create(
                 };
 
                 // Emit initiate call
+                // Emit initiate call
                 socket.emit('initiate_call', {
                     callerId: currentUser?._id,
                     receiverId,
@@ -388,15 +399,33 @@ const useVideoCallStore = create(
                     callStatus: 'calling',
                     isCallModalOpen: true,
                     localStream: stream,
+                    callError: null, // ✅ Clear any previous errors
                 });
+
+                console.log('[VideoCall] Call initiation request sent to backend');
 
             } catch (error) {
                 console.error('[VideoCall] Error initiating call:', error);
+
+                // Stop all tracks
+                const { localStream } = get();
+                if (localStream) {
+                    localStream.getTracks().forEach(track => track.stop());
+                }
+
                 set({
                     callError: error.message || 'Failed to initiate call',
                     callStatus: 'idle',
+                    localStream: null,
                 });
-                get().endCall();
+
+                // Don't call endCall() here - let the error state show briefly
+                setTimeout(() => {
+                    set({
+                        isCallModalOpen: false,
+                        callError: null
+                    });
+                }, 3000);
             }
         },
 
@@ -521,7 +550,6 @@ const useVideoCallStore = create(
                     callId: currentCall.callId,
                 });
 
-                get().endCall();
 
             } catch (error) {
                 console.error('[VideoCall] Error cancelling call:', error);
@@ -634,19 +662,36 @@ const useVideoCallStore = create(
                         console.log('[VideoCall] New ICE candidate');
 
                         const socket = getSocket();
-                        const { currentCall } = get();
+                        const state = get();
+                        const { currentCall } = state;
+                        const currentUser = state.getCurrentUser?.();
 
-                        if (socket && currentCall) {
-                            const participantId = currentCall.receiverId || currentCall.callerId;
-
-                            socket.emit('webrtc_ice_candidate', {
-                                candidate: event.candidate,
-                                receiverId: participantId,
-                                callId: currentCall.callId,
-                            });
+                        if (!socket || !currentCall || !currentUser?._id) {
+                            console.warn('[VideoCall] Missing data for ICE candidate emit');
+                            return;
                         }
+
+                        // 🔍 Main caller hu ya receiver?
+                        const isCaller = currentCall.callerId === currentUser._id;
+
+                        // 🔥 Hamesha remote user ko hi bhejo
+                        const remoteParticipantId = isCaller
+                            ? currentCall.receiverId              // agar main caller hoon → receiver remote
+                            : (currentCall.callerId || currentCall.receiverId); // agar main receiver hoon → caller remote
+
+                        if (!remoteParticipantId) {
+                            console.error('[VideoCall] Could not determine remote participant ID for ICE');
+                            return;
+                        }
+
+                        socket.emit('webrtc_ice_candidate', {
+                            candidate: event.candidate,
+                            receiverId: remoteParticipantId,
+                            callId: currentCall.callId,
+                        });
                     }
                 };
+
 
                 // Handle connection state
                 pc.onconnectionstatechange = () => {
