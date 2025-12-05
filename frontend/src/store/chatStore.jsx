@@ -8,6 +8,8 @@ export const useChatStore = create((set, get) => ({
     messages: [],
     loading: false,
     error: null,
+     messagesCursor: null,     // next page ke liye cursor
+    messagesHasMore: false,
     onlineUsers: new Map(),
     typingUsers: new Map(),
     currentUser: null,
@@ -271,31 +273,28 @@ export const useChatStore = create((set, get) => ({
         }
 
         // 👇 Ye part har call pe chalega (status refresh for all participants)
-        const { conversations, currentUser } = get();
+             // 👇 Ye part har call pe chalega (status refresh for all 1:1 participants)
+        const { conversations, currentUser, refreshUsersStatus } = get();
 
         if (conversations?.data?.length > 0 && currentUser?._id) {
+            const participantIds = [];
+
             conversations.data.forEach((conv) => {
                 const otherUser = conv.participants?.find(
                     (p) => p._id !== currentUser._id
                 );
 
                 if (otherUser?._id) {
-                    socket.emit("get_user_status", otherUser._id, (status) => {
-                        if (status && !status.error) {
-                            set((state) => {
-                                const newOnlineUsers = new Map(state.onlineUsers);
-                                newOnlineUsers.set(otherUser._id, {
-                                    isOnline: status.isOnline,
-                                    lastSeen: status.lastSeen,
-                                });
-                                return { onlineUsers: newOnlineUsers };
-                            });
-                        }
-                    });
+                    participantIds.push(otherUser._id);
                 }
             });
+
+            if (participantIds.length > 0) {
+                refreshUsersStatus(participantIds);
+            }
         }
     },
+
 
 
     // FETCH CONVERSATIONS
@@ -689,6 +688,32 @@ export const useChatStore = create((set, get) => ({
         return typingUsers.get(currentConversation)?.has(userId) || false;
     },
 
+        // BULK USER STATUS REFRESH (DM + channels ke members ke liye)
+    refreshUsersStatus: (userIds = []) => {
+        const socket = getSocket();
+        if (!socket || !Array.isArray(userIds) || userIds.length === 0) {
+            return;
+        }
+
+        // unique + valid ids
+        const uniqueIds = [...new Set(userIds.filter(Boolean))];
+
+        uniqueIds.forEach((id) => {
+            socket.emit("get_user_status", id, (status) => {
+                if (status && !status.error) {
+                    set((state) => {
+                        const newOnlineUsers = new Map(state.onlineUsers);
+                        newOnlineUsers.set(id, {
+                            isOnline: status.isOnline,
+                            lastSeen: status.lastSeen,
+                        });
+                        return { onlineUsers: newOnlineUsers };
+                    });
+                }
+            });
+        });
+    },
+
     // ONLINE STATUS
     isUserOnline: (userId) => {
         if (!userId) return false;
@@ -701,6 +726,9 @@ export const useChatStore = create((set, get) => ({
         const { onlineUsers } = get();
         return onlineUsers.get(userId)?.lastSeen || null;
     },
+
+
+
 
     cleanup: () => {
         const socket = getSocket();

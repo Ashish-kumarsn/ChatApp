@@ -5,6 +5,10 @@ const handleVideoCallEvent = require('./video-call-events');
 const socketMiddleware = require('../middleware/socketMiddleware');
 
 
+const handleChannelEvents = require('./channel-events'); // 👈 NEW
+
+
+
 const onlineUsers = new Map();
 
 const typingUsers = new Map();
@@ -428,6 +432,9 @@ const initializeSocket = (server) => {
                 });
             }
         });
+
+        handleChannelEvents(socket, io);
+
 
         // VIDEO CALL EVENTS
 

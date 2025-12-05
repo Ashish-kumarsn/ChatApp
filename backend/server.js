@@ -10,6 +10,7 @@ const chatRoute = require('./routes/chatRoute');
 const http = require('http')
 const initializeSocket = require('./services/socketService')
 const statusRoute = require('./routes/statusRoute')
+const channelRoutes = require('./routes/channelRoutes');
 
 
 
@@ -50,7 +51,7 @@ app.use((req,res,next) =>{
 app.use('/api/auth', authRoute);
 app.use('/api/chat',chatRoute);
 app.use('/api/status',statusRoute);
-
+app.use('/api/channels', channelRoutes);
 
 // health
 app.get('/', (req, res) => res.send('Backend running'));
