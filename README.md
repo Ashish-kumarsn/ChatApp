@@ -81,12 +81,6 @@
 
 ### **1️⃣ Clone the Repository**
 
-```bash
-git clone [https://github.com/yourusername/samvaad.git](https://github.com/Ashish-kumarsn/ChatApp)
-cd samvaad
-```
-
----
 
 ### **2️⃣ Setup Backend**
 
@@ -184,7 +178,7 @@ Contributions are welcome!
 
 ## 👨‍💻 Author
 
-**Your Name**
+**Ashish Kumar**
 - GitHub: [@Ashish-kumarsn](https://github.com/Ashish-kumarsn/)
 - LinkedIn: [Ashish-kumar](https://www.linkedin.com/in/ashish-kumar-a41a66256/)
 - Email: kaumatchobey@gmail.com
